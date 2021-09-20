@@ -1,6 +1,7 @@
 import numpy as np
 import tensorflow as tf
 import gym
+import pprint
 import time
 import safe_rl.pg.trust_region as tro
 from safe_rl.pg.agents import PPOAgent, TRPOAgent, CPOAgent
@@ -15,6 +16,8 @@ from safe_rl.utils.logx import EpochLogger
 from safe_rl.utils.mpi_tf import MpiAdamOptimizer, sync_all_params
 from safe_rl.utils.mpi_tools import mpi_fork, proc_id, num_procs, mpi_sum
 
+BOUND = .90
+
 # Multi-purpose agent runner for policy optimization algos 
 # (PPO, TRPO, their primal-dual equivalents, CPO)
 def run_polopt_agent(env_fn, 
@@ -24,9 +27,9 @@ def run_polopt_agent(env_fn,
                      seed=0,
                      render=False,
                      # Experience collection:
-                     steps_per_epoch=4000, 
+                     steps_per_epoch=8000, 
                      epochs=50, 
-                     max_ep_len=1000,
+                     max_ep_len=2000,
                      # Discount factors:
                      gamma=0.99, 
                      lam=0.97,
@@ -45,6 +48,7 @@ def run_polopt_agent(env_fn,
                      vf_iters=80, 
                      # Logging:
                      logger=None, 
+                     shielded=False,
                      logger_kwargs=dict(), 
                      save_freq=1
                      ):
@@ -62,6 +66,7 @@ def run_polopt_agent(env_fn,
     np.random.seed(seed)
 
     env = env_fn()
+    logger.save_env_config(env.config)
 
     agent.set_logger(logger)
 
@@ -265,6 +270,10 @@ def run_polopt_agent(env_fn,
     #=========================================================================#
     agent.prepare_session(sess)
 
+    # TODO FdH: fix
+    def unsafe(oo):
+        return ((oo['hazards_lidar'][:3] > BOUND).any() or
+                    (oo['hazards_lidar'][-3:] > BOUND).any())
 
     #=========================================================================#
     #  Create function for running update (called at end of each epoch)       #
@@ -339,7 +348,7 @@ def run_polopt_agent(env_fn,
     #=========================================================================#
 
     start_time = time.time()
-    o, r, d, c, ep_ret, ep_cost, ep_len = env.reset(), 0, False, 0, 0, 0, 0
+    (o, oo), r, d, c, ep_ret, ep_cost, ep_len = env.reset(), 0, False, 0, 0, 0, 0
     cur_penalty = 0
     cum_cost = 0
 
@@ -347,6 +356,7 @@ def run_polopt_agent(env_fn,
 
         if agent.use_penalty:
             cur_penalty = sess.run(penalty)
+        s_active = False
 
         for t in range(local_steps_per_epoch):
 
@@ -362,9 +372,17 @@ def run_polopt_agent(env_fn,
             vc_t = get_action_outs.get('vc', 0)  # Agent may not use cost value func
             logp_t = get_action_outs['logp_pi']
             pi_info_t = get_action_outs['pi_info']
+            if unsafe(oo):
+                a[0][0] = env.action_space.low[0]
+#                a[0][1] = ((env.action_space.high[1] + env.action_space.low[1]) / 1.7)
 
             # Step in environment
-            o2, r, d, info = env.step(a)
+            o2, oo2, r, d, info = env.step(a)
+            _r = r
+            if unsafe(oo) and not unsafe(oo2):
+                _r += .01
+            elif not unsafe(oo) and unsafe(oo2):
+                _r -= .01
 
             # Include penalty on cost
             c = info.get('cost', 0)
@@ -374,14 +392,15 @@ def run_polopt_agent(env_fn,
 
             # save and log
             if agent.reward_penalized:
-                r_total = r - cur_penalty * c
-                r_total = r_total / (1 + cur_penalty)
-                buf.store(o, a, r_total, v_t, 0, 0, logp_t, pi_info_t)
+                r_total = _r - cur_penalty * c
+                r_total = _r_total / (1 + cur_penalty)
+                buf.store(o, a, _r_total, v_t, 0, 0, logp_t, pi_info_t)
             else:
-                buf.store(o, a, r, v_t, c, vc_t, logp_t, pi_info_t)
+                buf.store(o, a, _r, v_t, c, vc_t, logp_t, pi_info_t)
             logger.store(VVals=v_t, CostVVals=vc_t)
 
             o = o2
+            oo = oo2
             ep_ret += r
             ep_cost += c
             ep_len += 1
@@ -409,7 +428,7 @@ def run_polopt_agent(env_fn,
                     print('Warning: trajectory cut off by epoch at %d steps.'%ep_len)
 
                 # Reset environment
-                o, r, d, c, ep_ret, ep_len, ep_cost = env.reset(), 0, False, 0, 0, 0, 0
+                (o, oo), r, d, c, ep_ret, ep_len, ep_cost = env.reset(), 0, False, 0, 0, 0, 0
 
         # Save model
         if (epoch % save_freq == 0) or (epoch == epochs-1):

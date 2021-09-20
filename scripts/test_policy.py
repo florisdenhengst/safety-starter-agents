@@ -5,7 +5,12 @@ import numpy as np
 from safe_rl.utils.load_utils import load_policy
 from safe_rl.utils.logx import EpochLogger
 
-
+def fprint(name, slice, var):
+    (start, size) = slice
+    print(name, end=":")
+    var_slice = var[start: start+size]
+    print(var_slice, end="\t")
+    print(var_slice.min(), var_slice.max())
 
 def run_policy(env, get_action, max_ep_len=None, num_episodes=100, render=True):
 
@@ -22,7 +27,7 @@ def run_policy(env, get_action, max_ep_len=None, num_episodes=100, render=True):
 
         a = get_action(o)
         a = np.clip(a, env.action_space.low, env.action_space.high)
-        o, r, d, info = env.step(a)
+        o, oo, r, d, info = env.step(a)
         ep_ret += r
         ep_cost += info.get('cost', 0)
         ep_len += 1
@@ -30,7 +35,7 @@ def run_policy(env, get_action, max_ep_len=None, num_episodes=100, render=True):
         if d or (ep_len == max_ep_len):
             logger.store(EpRet=ep_ret, EpCost=ep_cost, EpLen=ep_len)
             print('Episode %d \t EpRet %.3f \t EpCost %.3f \t EpLen %d'%(n, ep_ret, ep_cost, ep_len))
-            o, r, d, ep_ret, ep_cost, ep_len = env.reset(), 0, False, 0, 0, 0
+            o, oo, r, d, ep_ret, ep_cost, ep_len = env.reset(), 0, False, 0, 0, 0
             n += 1
 
     logger.log_tabular('EpRet', with_min_and_max=True)

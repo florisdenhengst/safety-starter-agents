@@ -6,11 +6,10 @@ from safe_rl.utils.run_utils import setup_logger_kwargs
 from safe_rl.utils.mpi_tools import mpi_fork
 
 
-def main(robot, task, algo, seed, exp_name, cpu):
-
+def main(robot, task, algo, seed, exp_name, cpu, shielded):
     # Verify experiment
-    robot_list = ['point', 'car', 'doggo']
-    task_list = ['goal1', 'goal2', 'button1', 'button2', 'push1', 'push2']
+    robot_list = ['point', 'forward', 'car', 'doggo']
+    task_list = ['goal1', 'goal2', 'sequence1', 'button1', 'button2', 'push1', 'push2']
     algo_list = ['ppo', 'ppo_lagrangian', 'trpo', 'trpo_lagrangian', 'cpo']
 
     algo = algo.lower()
@@ -23,6 +22,9 @@ def main(robot, task, algo, seed, exp_name, cpu):
     # Hyperparameters
     exp_name = algo + '_' + robot + task
     if robot=='Doggo':
+        num_steps = 1e8
+        steps_per_epoch = 60000
+    elif task == 'sequence':
         num_steps = 1e8
         steps_per_epoch = 60000
     else:
@@ -54,6 +56,7 @@ def main(robot, task, algo, seed, exp_name, cpu):
          target_kl=target_kl,
          cost_lim=cost_lim,
          seed=seed,
+         shielded=shielded,
          logger_kwargs=logger_kwargs
          )
 
@@ -65,9 +68,10 @@ if __name__ == '__main__':
     parser.add_argument('--robot', type=str, default='Point')
     parser.add_argument('--task', type=str, default='Goal1')
     parser.add_argument('--algo', type=str, default='ppo')
+    parser.add_argument('--shielded', type=bool, default=False)
     parser.add_argument('--seed', type=int, default=0)
     parser.add_argument('--exp_name', type=str, default='')
     parser.add_argument('--cpu', type=int, default=1)
     args = parser.parse_args()
     exp_name = args.exp_name if not(args.exp_name=='') else None
-    main(args.robot, args.task, args.algo, args.seed, exp_name, args.cpu)
+    main(args.robot, args.task, args.algo, args.seed, exp_name, args.cpu, args.shielded)

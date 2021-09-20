@@ -427,10 +427,10 @@ def sac(env_fn, actor_fn=mlp_actor, critic_fn=mlp_critic, ac_kwargs=dict(), seed
 
     def test_agent(n=10):
         for j in range(n):
-            o, r, d, ep_ret, ep_cost, ep_len, ep_goals, = test_env.reset(), 0, False, 0, 0, 0, 0
+            (o, oo), r, d, ep_ret, ep_cost, ep_len, ep_goals, = test_env.reset(), 0, False, 0, 0, 0, 0
             while not(d or (ep_len == max_ep_len)):
                 # Take deterministic actions at test time
-                o, r, d, info = test_env.step(get_action(o, True))
+                o, oo, r, d, info = test_env.step(get_action(o, True))
                 if render and proc_id() == 0 and j == 0:
                     test_env.render()
                 ep_ret += r
@@ -440,7 +440,7 @@ def sac(env_fn, actor_fn=mlp_actor, critic_fn=mlp_critic, ac_kwargs=dict(), seed
             logger.store(TestEpRet=ep_ret, TestEpCost=ep_cost, TestEpLen=ep_len, TestEpGoals=ep_goals)
 
     start_time = time.time()
-    o, r, d, ep_ret, ep_cost, ep_len, ep_goals = env.reset(), 0, False, 0, 0, 0, 0
+    (o, oo), r, d, ep_ret, ep_cost, ep_len, ep_goals = env.reset(), 0, False, 0, 0, 0, 0
     total_steps = steps_per_epoch * epochs
 
     # variables to measure in an update
@@ -469,7 +469,7 @@ def sac(env_fn, actor_fn=mlp_actor, critic_fn=mlp_critic, ac_kwargs=dict(), seed
             a = env.action_space.sample()
 
         # Step the env
-        o2, r, d, info = env.step(a)
+        o2, oo2, r, d, info = env.step(a)
         r *= reward_scale  # yee-haw
         c = info.get('cost', 0)
         ep_ret += r
@@ -492,7 +492,7 @@ def sac(env_fn, actor_fn=mlp_actor, critic_fn=mlp_critic, ac_kwargs=dict(), seed
 
         if d or (ep_len == max_ep_len):
             logger.store(EpRet=ep_ret, EpCost=ep_cost, EpLen=ep_len, EpGoals=ep_goals)
-            o, r, d, ep_ret, ep_cost, ep_len, ep_goals = env.reset(), 0, False, 0, 0, 0, 0
+            o, oo, r, d, ep_ret, ep_cost, ep_len, ep_goals = env.reset(), 0, False, 0, 0, 0, 0
 
         if t > 0 and t % update_freq == 0:
             for j in range(update_freq):

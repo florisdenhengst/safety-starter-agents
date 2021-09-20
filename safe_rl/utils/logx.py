@@ -129,6 +129,21 @@ class Logger:
         assert key not in self.log_current_row, "You already set %s this iteration. Maybe you forgot to call dump_tabular()"%key
         self.log_current_row[key] = val
 
+    def save_env_config(self, config):
+        """
+        Log an environment configuration.
+        """
+        config_json = convert_json(config)
+        if self.exp_name is not None:
+            config_json['exp_name'] = self.exp_name
+        if proc_id()==0:
+            output = json.dumps(config_json, separators=(',',':\t'), indent=4, sort_keys=True)
+            print(colorize('Saving config:\n', color='cyan', bold=True))
+            print(output)
+            with open(osp.join(self.output_dir, "envconfig.json"), 'w') as out:
+                out.write(output)
+
+
     def save_config(self, config):
         """
         Log an experiment configuration.
