@@ -16,7 +16,7 @@ from safe_rl.utils.logx import EpochLogger
 from safe_rl.utils.mpi_tf import MpiAdamOptimizer, sync_all_params
 from safe_rl.utils.mpi_tools import mpi_fork, proc_id, num_procs, mpi_sum
 
-BOUND = .90
+BOUND = .87
 
 # Multi-purpose agent runner for policy optimization algos 
 # (PPO, TRPO, their primal-dual equivalents, CPO)
@@ -27,9 +27,9 @@ def run_polopt_agent(env_fn,
                      seed=0,
                      render=False,
                      # Experience collection:
-                     steps_per_epoch=8000, 
+                     steps_per_epoch=4000, 
                      epochs=50, 
-                     max_ep_len=2000,
+                     max_ep_len=1000,
                      # Discount factors:
                      gamma=0.99, 
                      lam=0.97,
@@ -374,15 +374,16 @@ def run_polopt_agent(env_fn,
             pi_info_t = get_action_outs['pi_info']
             if unsafe(oo):
                 a[0][0] = env.action_space.low[0]
-#                a[0][1] = ((env.action_space.high[1] + env.action_space.low[1]) / 1.7)
+                a[0][1] = ((env.action_space.high[1] + env.action_space.low[1]) / 1.7)
 
             # Step in environment
+#            a = env.action_space.sample()
             o2, oo2, r, d, info = env.step(a)
             _r = r
-            if unsafe(oo) and not unsafe(oo2):
-                _r += .01
-            elif not unsafe(oo) and unsafe(oo2):
-                _r -= .01
+#            if unsafe(oo) and not unsafe(oo2):
+#                _r += .01
+#            elif not unsafe(oo) and unsafe(oo2):
+#                _r -= .01
 
             # Include penalty on cost
             c = info.get('cost', 0)

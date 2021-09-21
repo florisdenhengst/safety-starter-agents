@@ -9,7 +9,7 @@ from safe_rl.utils.mpi_tools import mpi_fork
 def main(robot, task, algo, seed, exp_name, cpu, shielded):
     # Verify experiment
     robot_list = ['point', 'forward', 'car', 'doggo']
-    task_list = ['goal1', 'goal2', 'sequence1', 'button1', 'button2', 'push1', 'push2']
+    task_list = ['goal1', 'goal2', 'sequence0', 'sequence1', 'button1', 'button2', 'push1', 'push2']
     algo_list = ['ppo', 'ppo_lagrangian', 'trpo', 'trpo_lagrangian', 'cpo']
 
     algo = algo.lower()
