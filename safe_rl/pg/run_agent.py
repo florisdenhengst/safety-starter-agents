@@ -363,7 +363,7 @@ def run_polopt_agent(env_fn,
         for t in range(local_steps_per_epoch):
 
             # Possibly render
-            if render and proc_id()==0 and t < 1000:
+            if render and proc_id()==0:
                 env.render()
             
             # Get outputs from policy
@@ -376,7 +376,7 @@ def run_polopt_agent(env_fn,
             pi_info_t = get_action_outs['pi_info']
             if unsafe(oo):
                 a[0][0] = env.action_space.low[0]
-                a[0][1] = ((env.action_space.high[1] + env.action_space.low[1]) / 1.7)
+#                a[0][1] = max(a[0][1], 0.3)
 
             # Step in environment
 #            a = env.action_space.sample()
