@@ -6,11 +6,14 @@ from safe_rl.utils.run_utils import setup_logger_kwargs
 from safe_rl.utils.mpi_tools import mpi_fork
 
 
-def main(robot, task, algo, seed, exp_name, cpu, shielded):
+def main(robot, task, algo, seed, exp_name, cpu, shielded, render):
     # Verify experiment
     robot_list = ['point', 'forward', 'car', 'doggo']
     task_list = ['goal1', 'goal2', 'sequence0', 'sequence1', 'button1', 'button2', 'push1', 'push2']
     algo_list = ['ppo', 'ppo_lagrangian', 'trpo', 'trpo_lagrangian', 'cpo']
+    for h in range(8):
+        for s in range(1,5):
+            task_list += ['sequence{}{}'.format(h,s)]
 
     algo = algo.lower()
     task = task.capitalize()
@@ -57,7 +60,8 @@ def main(robot, task, algo, seed, exp_name, cpu, shielded):
          cost_lim=cost_lim,
          seed=seed,
          shielded=shielded,
-         logger_kwargs=logger_kwargs
+         logger_kwargs=logger_kwargs,
+         render=render,
          )
 
 
@@ -72,6 +76,7 @@ if __name__ == '__main__':
     parser.add_argument('--seed', type=int, default=0)
     parser.add_argument('--exp_name', type=str, default='')
     parser.add_argument('--cpu', type=int, default=1)
+    parser.add_argument('--render', action='store_true', default=False)
     args = parser.parse_args()
     exp_name = args.exp_name if not(args.exp_name=='') else None
-    main(args.robot, args.task, args.algo, args.seed, exp_name, args.cpu, args.shielded)
+    main(args.robot, args.task, args.algo, args.seed, exp_name, args.cpu, args.shielded, args.render)

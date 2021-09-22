@@ -16,7 +16,7 @@ from safe_rl.utils.logx import EpochLogger
 from safe_rl.utils.mpi_tf import MpiAdamOptimizer, sync_all_params
 from safe_rl.utils.mpi_tools import mpi_fork, proc_id, num_procs, mpi_sum
 
-BOUND = .87
+BOUND = .85
 
 # Multi-purpose agent runner for policy optimization algos 
 # (PPO, TRPO, their primal-dual equivalents, CPO)
@@ -380,10 +380,10 @@ def run_polopt_agent(env_fn,
 #            a = env.action_space.sample()
             o2, oo2, r, d, info = env.step(a)
             _r = r
-#            if unsafe(oo) and not unsafe(oo2):
-#                _r += .01
-#            elif not unsafe(oo) and unsafe(oo2):
-#                _r -= .01
+            if unsafe(oo) and not unsafe(oo2):
+                _r += .01
+            elif not unsafe(oo) and unsafe(oo2):
+                _r -= .01
 
             # Include penalty on cost
             c = info.get('cost', 0)
@@ -394,8 +394,8 @@ def run_polopt_agent(env_fn,
             # save and log
             if agent.reward_penalized:
                 r_total = _r - cur_penalty * c
-                r_total = _r_total / (1 + cur_penalty)
-                buf.store(o, a, _r_total, v_t, 0, 0, logp_t, pi_info_t)
+                r_total = r_total / (1 + cur_penalty)
+                buf.store(o, a, r_total, v_t, 0, 0, logp_t, pi_info_t)
             else:
                 buf.store(o, a, _r, v_t, c, vc_t, logp_t, pi_info_t)
             logger.store(VVals=v_t, CostVVals=vc_t)
