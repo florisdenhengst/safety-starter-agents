@@ -272,6 +272,8 @@ def run_polopt_agent(env_fn,
 
     # TODO FdH: fix
     def unsafe(oo):
+        if 'hazards_lidar' not in oo:
+            return False 
         return ((oo['hazards_lidar'][:3] > BOUND).any() or
                     (oo['hazards_lidar'][-3:] > BOUND).any())
 
