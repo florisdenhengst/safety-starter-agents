@@ -13,7 +13,8 @@ def main(robot, task, algo, seed, exp_name, cpu, shielded, render):
     algo_list = ['ppo', 'ppo_lagrangian', 'trpo', 'trpo_lagrangian', 'cpo']
     for h in range(8):
         for s in range(1,5):
-            task_list += ['sequence{}{}'.format(h,s)]
+            for rsl in ['n', 'l', 'h']:
+                task_list += ['sequence{}{}{}'.format(h,s,rsl)]
 
     algo = algo.lower()
     task = task.capitalize()

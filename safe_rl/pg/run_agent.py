@@ -381,9 +381,9 @@ def run_polopt_agent(env_fn,
             o2, oo2, r, d, info = env.step(a)
             _r = r
             if unsafe(oo) and not unsafe(oo2):
-                _r += .01
+                _r += env.shaping_reward
             elif not unsafe(oo) and unsafe(oo2):
-                _r -= .01
+                _r -= env.shaping_reward
 
             # Include penalty on cost
             c = info.get('cost', 0)
