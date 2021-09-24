@@ -16,7 +16,8 @@ from safe_rl.utils.logx import EpochLogger
 from safe_rl.utils.mpi_tf import MpiAdamOptimizer, sync_all_params
 from safe_rl.utils.mpi_tools import mpi_fork, proc_id, num_procs, mpi_sum
 
-BOUND = .85
+BOUND_S = np.linspace(.83, .9, 4)
+BOUND_E = BOUND_S[::-1]
 
 # Multi-purpose agent runner for policy optimization algos 
 # (PPO, TRPO, their primal-dual equivalents, CPO)
@@ -50,6 +51,7 @@ def run_polopt_agent(env_fn,
                      logger=None, 
                      shielded=False,
                      logger_kwargs=dict(), 
+                     shaping_reward=0.1,
                      save_freq=1
                      ):
 
@@ -272,10 +274,21 @@ def run_polopt_agent(env_fn,
 
     # TODO FdH: fix
     def unsafe(oo):
+        if 'walls_lidar' not in oo:
+            wl = False
+        else:
+            wl = ((oo['walls_lidar'][:len(BOUND_S)] > BOUND_S).any() or
+                    (oo['walls_lidar'][-len(BOUND_E):] > BOUND_E).any())
         if 'hazards_lidar' not in oo:
-            return False 
-        return ((oo['hazards_lidar'][:3] > BOUND).any() or
-                    (oo['hazards_lidar'][-3:] > BOUND).any())
+            hl = False
+        else:
+            hl = ((oo['hazards_lidar'][:len(BOUND_S)] > BOUND_S).any() or
+                    (oo['hazards_lidar'][-len(BOUND_E):] > BOUND_E).any())
+        return hl or wl
+    
+    def moving(oo):
+        moving = (np.absolute(oo['velocimeter'][:2]) > [.1, .01]).any()
+        return moving
 
     #=========================================================================#
     #  Create function for running update (called at end of each epoch)       #
@@ -350,7 +363,7 @@ def run_polopt_agent(env_fn,
     #=========================================================================#
 
     start_time = time.time()
-    (o, oo), r, d, c, ep_ret, ep_cost, ep_len = env.reset(), 0, False, 0, 0, 0, 0
+    (o, oo), r, d, c, ep_ret, sep_ret, ep_cost, ep_len = env.reset(), 0, False, 0, 0, 0, 0, 0
     cur_penalty = 0
     cum_cost = 0
 
@@ -359,6 +372,9 @@ def run_polopt_agent(env_fn,
         if agent.use_penalty:
             cur_penalty = sess.run(penalty)
         s_active = False
+        # TODO FdH: remove
+        state = 0 
+        prev_state = 0 
 
         for t in range(local_steps_per_epoch):
 
@@ -374,18 +390,37 @@ def run_polopt_agent(env_fn,
             vc_t = get_action_outs.get('vc', 0)  # Agent may not use cost value func
             logp_t = get_action_outs['logp_pi']
             pi_info_t = get_action_outs['pi_info']
+
             if unsafe(oo):
+                if state in [0,1] and moving(oo):
+                    state = 1
+                    a[0][1] = 0.0
+                elif state in [0,1] and not moving(oo):
+                    state = 2
                 a[0][0] = env.action_space.low[0]
-#                a[0][1] = max(a[0][1], 0.3)
+            else:
+                state = 0
 
             # Step in environment
-#            a = env.action_space.sample()
             o2, oo2, r, d, info = env.step(a)
             _r = r
-            if unsafe(oo) and not unsafe(oo2):
-                _r += env.shaping_reward
-            elif not unsafe(oo) and unsafe(oo2):
+            # TODO FdH: remove shaping hacks
+            if prev_state == 0 and state == 1:
                 _r -= env.shaping_reward
+                sep_ret += env.shaping_reward
+            elif prev_state == 1 and state == 2:
+                _r += env.shaping_reward
+                sep_ret += env.shaping_reward
+            elif prev_state == 1 and state == 0:
+                _r += env.shaping_reward
+                sep_ret += env.shaping_reward
+            elif prev_state == 2 and state == 0:
+                _r += env.shaping_reward
+                sep_ret += env.shaping_reward
+            elif prev_state == 2 and state == 1:
+                _r -= env.shaping_reward
+                sep_ret += env.shaping_reward
+                 
 
             # Include penalty on cost
             c = info.get('cost', 0)
@@ -407,8 +442,10 @@ def run_polopt_agent(env_fn,
             ep_ret += r
             ep_cost += c
             ep_len += 1
+            prev_state = state
 
             terminal = d or (ep_len == max_ep_len)
+
             if terminal or (t==local_steps_per_epoch-1):
 
                 # If trajectory didn't reach terminal state, bootstrap value target(s)
@@ -426,12 +463,14 @@ def run_polopt_agent(env_fn,
 
                 # Only save EpRet / EpLen if trajectory finished
                 if terminal:
-                    logger.store(EpRet=ep_ret, EpLen=ep_len, EpCost=ep_cost)
+                    logger.store(EpRet=ep_ret, EpLen=ep_len, EpCost=ep_cost, SEpRet=sep_ret)
                 else:
                     print('Warning: trajectory cut off by epoch at %d steps.'%ep_len)
 
                 # Reset environment
                 (o, oo), r, d, c, ep_ret, ep_len, ep_cost = env.reset(), 0, False, 0, 0, 0, 0
+                state = 0
+                prev_state = 0
 
         # Save model
         if (epoch % save_freq == 0) or (epoch == epochs-1):
