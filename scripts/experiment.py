@@ -13,15 +13,15 @@ def main(robot, task, algo, seed, exp_name, cpu, shielded, render):
     algo_list = ['ppo', 'ppo_lagrangian', 'trpo', 'trpo_lagrangian', 'cpo']
     for h in range(8):
         for s in range(1,5):
-            for rsl in ['n', 'l', 'h']:
+            for rsl in ['n', 'l', 'h', 'm']:
                 task_list += ['sequence{}{}{}'.format(h,s,rsl)]
 
     algo = algo.lower()
     task = task.capitalize()
     robot = robot.capitalize()
-    assert algo in algo_list, "Invalid algo"
-    assert task.lower() in task_list, "Invalid task"
-    assert robot.lower() in robot_list, "Invalid robot"
+    assert algo in algo_list, "Invalid algo {}".format(algo)
+    assert task.lower() in task_list, "Invalid task {}".format(task)
+    assert robot.lower() in robot_list, "Invalid robot {}".format(robot)
 
     # Hyperparameters
     exp_name = algo + '_' + robot + task
